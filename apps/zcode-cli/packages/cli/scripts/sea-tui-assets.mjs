@@ -129,12 +129,12 @@ const runtimePackageNames = async ({ root, target, workspacePackageDirectories }
   if (!tuiDirectory) {
     throw new Error("Missing @zcode/tui workspace package.");
   }
+  // react-devtools-core 仅在 DEV=true 时按需加载且缺失可容忍，故意不打包（约 15MB）。
   const queue = [
     { fromDirectory: tuiDirectory, packageName: "@zcode/tui" },
     { fromDirectory: tuiDirectory, packageName: opentuiCorePackageName },
     { fromDirectory: tuiDirectory, packageName: opentuiReactPackageName },
     { fromDirectory: tuiDirectory, packageName: "react" },
-    { fromDirectory: tuiDirectory, packageName: "react-devtools-core" },
     { fromDirectory: tuiDirectory, packageName: "ws" },
   ];
   const placements = new Map();

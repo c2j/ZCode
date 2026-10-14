@@ -732,9 +732,6 @@ importers:
       react:
         specifier: 19.2.7
         version: 19.2.7
-      react-devtools-core:
-        specifier: 7.0.1
-        version: 7.0.1
       shiki:
         specifier: ^4.1.0
         version: 4.1.0
@@ -748,6 +745,9 @@ importers:
       '@types/react':
         specifier: 19.2.0
         version: 19.2.0
+      react-devtools-core:
+        specifier: 7.0.1
+        version: 7.0.1
       tsx:
         specifier: ^4.20.0
         version: 4.21.0
