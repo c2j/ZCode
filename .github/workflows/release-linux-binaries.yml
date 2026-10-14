@@ -85,18 +85,6 @@ jobs:
       - name: Build SEA binary (linux-${{ matrix.arch }})
         run: pnpm --filter @zcode/cli exec node scripts/build-sea.mjs --target linux-${{ matrix.arch }}
 
-      # UPX 压缩最终二进制（体积约 -40%）；必须在 checksum 之前，让校验覆盖最终产物。
-      # 压缩后重新执行 --version，验证加壳后的二进制可正常解包启动。
-      - name: Compress binary with UPX
-        working-directory: apps/zcode-cli/packages/cli/dist
-        run: |
-          sudo apt-get update -y -qq
-          sudo apt-get install -y -qq upx-ucl
-          upx --lzma "zcode-linux-${{ matrix.arch }}"
-          storage_root=$(mktemp -d)
-          ZCODE_STORAGE_DIR="$storage_root" ./"zcode-linux-${{ matrix.arch }}" --version
-          rm -rf "$storage_root"
-
       - name: Generate SHA-256 checksum
         working-directory: apps/zcode-cli/packages/cli/dist
         run: sha256sum "zcode-linux-${{ matrix.arch }}" > "zcode-linux-${{ matrix.arch }}.sha256"
