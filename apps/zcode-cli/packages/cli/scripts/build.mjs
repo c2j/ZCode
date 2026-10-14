@@ -10,7 +10,8 @@ const projectRoot = resolve(cliRoot, "../..");
 const executableFileMode = 0o755;
 const packageJsonFile = "package.json";
 const rootPackageVersionError = "Root package.json must define a non-empty string version.";
-const desktopAgentBuildFlag = "--desktop-agent";
+export const desktopAgentBuildFlag = "--desktop-agent";
+export const seaBuildFlag = "--sea";
 export const resolveBuildExternal = () => ["@zcode/tui", "playwright-core", "koffi"];
 
 export const readZodBuildVersion = async () => {
@@ -122,12 +123,14 @@ export const readRootPackageVersion = async ({ root = projectRoot } = {}) => {
 
 export const resolveBuildOptions = (args = [], env = process.env) => {
   const desktopAgent = args.includes(desktopAgentBuildFlag);
+  const sea = args.includes(seaBuildFlag);
   const e2eCoverage = env.ZCODE_E2E_COVERAGE === "1";
 
   return {
-    // desktop-agent 正常发布仍需压缩且不携带 map；E2E coverage
+    // desktop-agent 正常发布仍需压缩且不携带 map；SEA 独立二进制同样需要压缩
+    // 以控制体积（与 desktop-agent 同策略，保留函数/类名）；E2E coverage
     // 专用构建必须保留原始符号和 source map，c8 才能回映到各 package 的 TS 源码。
-    minify: desktopAgent && !e2eCoverage,
+    minify: (desktopAgent || sea) && !e2eCoverage,
     sourcemap: e2eCoverage || !desktopAgent,
   };
 };

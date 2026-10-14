@@ -196,6 +196,17 @@ test("desktop agent builds minify the app-facing JS bundle", () => {
   });
 });
 
+test("SEA builds minify the JS bundle while keeping the external source map", () => {
+  assert.deepEqual(resolveBuildOptions(["--sea"]), {
+    minify: true,
+    sourcemap: true,
+  });
+  assert.deepEqual(resolveBuildOptions(["--sea"], { ZCODE_E2E_COVERAGE: "1" }), {
+    minify: false,
+    sourcemap: true,
+  });
+});
+
 test("CLI bundle externalizes native koffi so esbuild does not parse platform .node files", () => {
   assert.ok(resolveBuildExternal().includes("koffi"));
 });
