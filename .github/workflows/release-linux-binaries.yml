@@ -131,10 +131,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # electron-builder 打 rpm 需要 rpmbuild；AppImage/deb 工具链 runner 自带，
-      # appimagetool 由 electron-builder 自动下载。
+      # electron-builder 打 rpm 需要 rpmbuild，fpm 系目标（pacman 等）需要 bsdtar；
+      # AppImage/deb 工具链 runner 自带，appimagetool 由 electron-builder 自动下载。
       - name: Install linux packaging tools
-        run: sudo apt-get update -y -qq && sudo apt-get install -y -qq rpm
+        run: sudo apt-get update -y -qq && sudo apt-get install -y -qq rpm libarchive-tools
 
       - name: Bundle desktop app (linux-${{ matrix.arch }})
         run: pnpm bundle:desktop -- --os linux --arch ${{ matrix.arch }}
@@ -147,6 +147,7 @@ jobs:
             packages/desktop/dist/*.AppImage
             packages/desktop/dist/*.deb
             packages/desktop/dist/*.rpm
+            packages/desktop/dist/*.pkg.tar.zst
           if-no-files-found: error
 
   release:
@@ -157,11 +158,23 @@ jobs:
     permissions:
       contents: write
     steps:
+      # 不合并 artifact：每个 artifact 落到 dist/<artifact 名>/，再逐目录打 zip，
+      # 无需硬编码 electron-builder 的产物文件名。
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          merge-multiple: true
           path: dist
+
+      # 每个 artifact 打一个 zip（含二进制/安装包与其 sha256），并为 zip 生成校验文件。
+      - name: Pack release archives
+        working-directory: dist
+        run: |
+          for dir in */; do
+            name="${dir%/}"
+            zip -qr "${name}.zip" "$name"
+            sha256sum "${name}.zip" > "${name}.zip.sha256"
+          done
+          ls -la ./*.zip ./*.zip.sha256
 
       - name: Create release and upload binaries
         env:
@@ -170,4 +183,4 @@ jobs:
         run: |
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --generate-notes
-          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber dist/*
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber dist/*.zip dist/*.zip.sha256
