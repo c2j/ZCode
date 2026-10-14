@@ -66,8 +66,14 @@ jobs:
       - name: Typecheck and emit workspace dist files
         run: pnpm typecheck
 
-      - name: Build CLI bundle and workspace dependencies
-        run: pnpm --filter @zcode/cli... build
+      # 与包内 build:sea 脚本保持一致：先构建 CLI workspace 内除 CLI 外的所有包
+      #（含仅作为 SEA 资源打包、而非 CLI 依赖的包，如 @zcode/node-repl-host），
+      # 再单独构建 CLI bundle。根 packages/* 的 dist 由上一步 tsc -b 生成。
+      - name: Build CLI workspace packages
+        run: pnpm exec turbo --skip-infer --cwd apps/zcode-cli run build --filter=!@zcode/cli --force
+
+      - name: Build CLI bundle
+        run: pnpm --filter @zcode/cli build
 
       # build-sea.mjs 按 target 下载 nodejs.org 官方二进制并校验 SHASUMS256；
       # native-search 工具在无内网源时解包仓库内 apps/zcode-cli/dependencies/native-search 归档。
