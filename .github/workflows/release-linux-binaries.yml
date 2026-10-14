@@ -1,0 +1,106 @@
+# 版本 tag 触发的 Linux 独立二进制（Node.js SEA）发布流水线。
+#
+# 产物：zcode-linux-x64 / zcode-linux-arm64 单文件可执行 + SHA-256 校验文件。
+#
+# glibc 兼容性：SEA 基础二进制来自 nodejs.org 官方发行（Node 24.x 官方 Linux
+# 构建基于 RHEL 8，最低要求 glibc 2.28），脚本会将官方二进制下载并注入 bundle。
+# 分发时请在发布说明中标注最低系统要求为 glibc 2.28（Ubuntu 20.04+ / RHEL 8+）。
+#
+# 架构矩阵：两个架构各用原生 runner（host target 构建后 build-sea.mjs 会自动
+# 执行 --version 冒烟验证）。ubuntu-24.04-arm 对公共仓库免费；私有仓库需启用
+# 对应付费 arm runner，否则任务会一直排队。
+name: Release Linux Binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-linux-binaries-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # 与 mise.toml / 根 package.json engines 保持一致；SEA 基础二进制版本取自构建机 Node。
+  NODE_VERSION: "24.14.0"
+
+jobs:
+  build-linux:
+    name: Build linux-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      # CLI 二进制构建不依赖 Electron 运行时，跳过其 postinstall 二进制下载。
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Assert Node version
+        run: pnpm run ci:assert-node
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build CLI bundle and workspace dependencies
+        run: pnpm --filter @zcode/cli... build
+
+      # build-sea.mjs 按 target 下载 nodejs.org 官方二进制并校验 SHASUMS256；
+      # native-search 工具在无内网源时解包仓库内 apps/zcode-cli/dependencies/native-search 归档。
+      - name: Build SEA binary (linux-${{ matrix.arch }})
+        run: pnpm --filter @zcode/cli exec node scripts/build-sea.mjs --target linux-${{ matrix.arch }}
+
+      - name: Generate SHA-256 checksum
+        working-directory: apps/zcode-cli/packages/cli/dist
+        run: sha256sum "zcode-linux-${{ matrix.arch }}" > "zcode-linux-${{ matrix.arch }}.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zcode-linux-${{ matrix.arch }}
+          path: |
+            apps/zcode-cli/packages/cli/dist/zcode-linux-${{ matrix.arch }}
+            apps/zcode-cli/packages/cli/dist/zcode-linux-${{ matrix.arch }}.sha256
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build-linux
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Create release and upload binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --generate-notes
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber dist/*
