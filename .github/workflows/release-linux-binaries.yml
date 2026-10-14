@@ -72,6 +72,11 @@ jobs:
       - name: Build CLI workspace packages
         run: pnpm exec turbo --skip-infer --cwd apps/zcode-cli run build --filter=!@zcode/cli --force
 
+      # 根 packages/* 中 CLI 依赖闭包内、有 build 脚本的包（如 @zcode/model-option-map，
+      # tsc 构建产物被 SEA 资源收集引用），turbo（cwd 限定在 apps/zcode-cli）覆盖不到。
+      - name: Build root workspace dependencies
+        run: pnpm --filter "@zcode/cli..." --filter "!@zcode/cli" build
+
       - name: Build CLI bundle
         run: pnpm --filter @zcode/cli build
 
