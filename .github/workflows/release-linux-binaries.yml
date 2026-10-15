@@ -2,7 +2,7 @@
 #
 # 产物（amd64 + arm64，双架构各用原生 runner 构建）：
 # - 独立二进制（Node.js SEA）：zcode-linux-x64 / zcode-linux-arm64 + SHA-256。
-# - 桌面版（Electron）：AppImage / deb / rpm（packages/desktop/dist）。
+# - 桌面版（Electron）：AppImage（packages/desktop/dist）。
 #
 # glibc 兼容性：SEA 基础二进制来自 nodejs.org 官方发行（Node 24.x 官方 Linux
 # 构建基于 RHEL 8，最低要求 glibc 2.28），脚本会将官方二进制下载并注入 bundle。
@@ -131,11 +131,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # electron-builder 打 rpm 需要 rpmbuild，fpm 系目标（pacman 等）需要 bsdtar；
-      # AppImage/deb 工具链 runner 自带，appimagetool 由 electron-builder 自动下载。
-      - name: Install linux packaging tools
-        run: sudo apt-get update -y -qq && sudo apt-get install -y -qq rpm libarchive-tools
-
+      # 只出 AppImage：工具链 runner 自带，appimagetool 由 electron-builder 自动下载；
+      # 不再需要 rpmbuild / bsdtar（deb/rpm/pacman 已下线）。
       - name: Bundle desktop app (linux-${{ matrix.arch }})
         run: pnpm bundle:desktop -- --os linux --arch ${{ matrix.arch }}
 
@@ -143,11 +140,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zcode-desktop-linux-${{ matrix.arch }}
-          path: |
-            packages/desktop/dist/*.AppImage
-            packages/desktop/dist/*.deb
-            packages/desktop/dist/*.rpm
-            packages/desktop/dist/*.pkg.tar.zst
+          path: packages/desktop/dist/*.AppImage
           if-no-files-found: error
 
   release:

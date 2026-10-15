@@ -154,7 +154,7 @@ SettingsPage(置灰判断;Web/远控无桥不实现,设置项本就仅桌面显�
 
 - **托盘图标素材**:Linux 托盘 22~24px 下直接用彩色应用 PNG 可辨识度一般;后续出单色 symbolic 风格图标(深浅主题各一版)
 - **能力动态监听**:可订阅 DBus `NameOwnerChanged` 实时感知 watcher 上线/下线并动态建/销毁托盘;本期以"设置页查询刷新"覆盖主场景
-- **真机验证项**(CI 容器无桌面会话,无法覆盖):KDE/XFCE 托盘交互、GNOME 装扩展前后、AppImage/deb/rpm/pacman 四包格式;列 MR 待验证
+- **真机验证项**(CI 容器无桌面会话,无法覆盖):KDE/XFCE 托盘交互、GNOME 装扩展前后、AppImage 安装格式;列 MR 待验证
 - GNOME 上左键单击行为受 AppIndicator 扩展实现影响(可能弹菜单而非触发 `click`),`double-click` 与菜单入口兜底
 
 ## 测试要求

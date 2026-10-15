@@ -17,10 +17,7 @@ import {
 } from "./scripts/node-pty-package-assets.mjs";
 import { cleanupPackagedSourcemaps } from "./scripts/packaged-sourcemap-cleanup.mjs";
 import { getTargetPlatform } from "./scripts/target-platform.mjs";
-import {
-  resolveDesktopArtifactSuffix,
-  resolveDesktopProductIdentity,
-} from "./scripts/desktop-product-identity.mjs";
+import { resolveDesktopProductIdentity } from "./scripts/desktop-product-identity.mjs";
 import { createWindowsPowerShellSecurityArgs } from "./scripts/powershell-command.mjs";
 import { isSharpRequiredByComputerUse, verifyStagedSharp } from "./scripts/sharp-package-assets.mjs";
 import { isRealComputerUseProducerInstalled } from "./scripts/computer-use-producer.mjs";
@@ -145,20 +142,6 @@ const REQUIRED_ASAR_RUNTIME_MODULES = [
   // 自动更新链路直接崩。ms 是叶子包，显式注入即可让 debug 在 app.asar 内稳定解析。
   "ms",
 ];
-// pacman 依赖必须使用 Arch 官方仓库中的包名。electron-builder 的历史默认集合包含
-// 已移除的 libappindicator-gtk3/http-parser，且缺少 Electron 实际需要的运行库；显式
-// 维护最小运行时闭包，避免 pacman -U 无法解析依赖或启动时才暴露缺库。
-const PACMAN_RUNTIME_DEPENDENCIES = [
-  "gtk3",
-  "nss",
-  "libxss",
-  "libxtst",
-  "libnotify",
-  "alsa-lib",
-  "mesa",
-  "xdg-utils",
-];
-
 const WINDOWS_INSTALL_MANIFEST_NAME = ".zcode-install-manifest";
 
 async function writeWindowsInstallManifest(context) {
@@ -214,8 +197,6 @@ function assertPackagedCuaHelper(context) {
 const shouldEnableWindowsVsign =
   process.platform === "win32" && process.env.ZCODE_ENABLE_WINDOWS_SIGN === "1";
 const commandStdoutMaxBuffer = 64 * 1024 * 1024;
-// 产物后缀只标记后端环境（_TEST）；身份靠 productName 区分，生产后端的 Preview 包没有后缀。
-const desktopArtifactEnvSuffix = resolveDesktopArtifactSuffix(process.env);
 
 // Preview 是内部签名测试包。CI 明确打开 macOS 签名时若没有身份，必须在生成未签名包前失败，
 // 避免“产物存在”被误认为已经走完和生产版相同的签名链路。
@@ -245,8 +226,8 @@ const PACKAGING_PRUNE_PATTERNS = [
 ];
 
 function buildDesktopArtifactName(platformName, extension = "${ext}") {
-  // 测试环境产物必须和正式安装包文件名区分，避免上传、下载或人工验收时混用。
-  return `\${productName}-\${version}-${platformName}-\${arch}${desktopArtifactEnvSuffix}.${extension}`;
+  // 产物名只保留产品身份，不再追加测试后端后缀；测试/正式包靠 productName 区分。
+  return `\${productName}-\${version}-${platformName}-\${arch}.${extension}`;
 }
 
 function runAsarCommand(args) {
@@ -868,7 +849,9 @@ export default {
       : {}),
   },
   linux: {
-    target: ["AppImage", "deb", "rpm", "pacman"],
+    // 只分发 AppImage：electron-updater 在 Linux 上固定以 AppImage 作为更新产物，
+    // scripts/upload-oss.sh 也按 AppImage 解析更新元数据。deb/rpm/pacman 已下线。
+    target: ["AppImage"],
     artifactName: buildDesktopArtifactName("linux"),
     // desktop 包名是 scoped package（@zcode/desktop），electron-builder 默认会把
     // Linux executable/Icon 推成 @zcodedesktop。部分桌面环境无法按这个 icon name 命中
@@ -877,30 +860,6 @@ export default {
     executableName: desktopProductIdentity.linuxExecutableName,
     category: "Development",
     maintainer: "ZCode <dev@zcode.z.ai>",
-  },
-  deb: {
-    // 生产版与 Preview 必须是两个 dpkg package；只改可执行名仍会让安装器把另一版本当成升级替换。
-    packageName: desktopProductIdentity.linuxPackageName,
-  },
-  pacman: {
-    // 与 deb/rpm 保持相同的 flavor 隔离，避免 Preview/Production 被 pacman 当作同一包覆盖。
-    packageName: desktopProductIdentity.linuxPackageName,
-    // 显式列出 Arch 官方仓库可解析的 Electron 运行时依赖，替换 electron-builder
-    // 陈旧默认集合，避免安装阶段因已移除包名直接失败。
-    depends: PACMAN_RUNTIME_DEPENDENCIES,
-    // Electron Builder 默认把 pacman target 命名为 .pacman；Arch 原生包的标准扩展名是 .pkg.tar.zst。
-    artifactName: buildDesktopArtifactName("linux", "pkg.tar.zst"),
-  },
-  rpm: {
-    // 与 deb 同一约束：生产版与 Preview 必须是两个独立 rpm 包，否则 dnf 会把另一 flavor 当成升级替换。
-    // rpm 面向 RHEL 8+（glibc 2.28）分发；整包 glibc 下限由 node-pty prebuild 与 bfs/ugrep 抬到 2.28，
-    // Electron 41 主二进制只引用到 2.25，不会更高。fpm 产 rpm 需要构建机提供 rpmbuild 与 xz。
-    packageName: desktopProductIdentity.linuxPackageName,
-    // electron-builder 的 rpm 默认 Requires（gtk3/nss/libXtst 等）不包含 Electron ELF 实际
-    // DT_NEEDED 的 mesa-libgbm 与 alsa-lib；rockylinux:8 最小化容器实测装完后启动报
-    // libgbm.so.1 缺失。这里用 fpm 追加 -d（在默认 Requires 之后累积），不能用 depends——
-    // depends 会整组替换默认 Requires 集。
-    fpm: ["-d", "mesa-libgbm", "-d", "alsa-lib"],
   },
   dmg: {
     // 当前安装包携带的运行时资源（尤其 agent node_modules）体积已超过默认 DMG 估算值。

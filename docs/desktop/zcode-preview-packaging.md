@@ -214,7 +214,7 @@ workflow path selection
 - YAML syntax parse: `.gitlab/ci/00-workflow.yml` 与 `.gitlab/ci/preview-child.yml` 均通过。
 - Preview packaging 基线的 `pnpm test:unit:affected`: expanded to the full unit suite by the repository pre-push rule; 841 files passed, 6478 tests passed, 1 skipped.
 - 本次手动触发改动的 `pnpm test:unit:affected`: passed；lint-staged 选中 CI 配置测试，1 file / 20 tests passed。
-- electron-builder schema validation: both `ZCODE_ENV=test` and `ZCODE_ENV=production` configurations passed; resolved Preview identity is `dev.zcode.app.preview` / `ZCode Preview` / `zcode-preview` / `_TEST`.
+- electron-builder schema validation: both `ZCODE_ENV=test` and `ZCODE_ENV=production` configurations passed; resolved Preview identity is `dev.zcode.app.preview` / `ZCode Preview` / `zcode-preview`（产物名不再追加环境后缀）.
 - macOS scripts: `bash -n` passed; Preview missing-signing/notarization-credential paths are covered by fail-closed tests.
 - Runtime failure evidence: GitLab Runner 18.7.2 中 parent default `ZCODE_CI_TMPDIR="$CI_PROJECT_DIR/.tmp"` 经 trigger 转发后变为 `/.tmp`，child 首个 setup 因 `mkdir: /.tmp: Read-only file system` 失败；根因修复为 `build:preview.inherit.variables=false`，不修改共享 build/sign/notarize DAG。
 - Remaining manual gate: 在真实 MR 重试 `build:preview`，确认 child 的 temp/cache 路径位于 runner checkout 且完成全平台打包；安装签名的 macOS/Windows/Linux 产物并在目标系统验证 ZPREVIEW-013。
@@ -251,7 +251,7 @@ workflow path selection
 | 身份推导 | `flavor = ZCODE_PREVIEW_IDENTITY 为真 \|\| ZCODE_ENV=test ? preview : production` | 测试后端永远是 Preview，开关无法把测试后端包变成正式 `ZCode` |
 | 身份含义 | 整套 Preview 身份，不是只改显示名 | appId `dev.zcode.app.preview`、`ZCode Preview` 应用名、独立 Electron `userData`、Linux `zcode-preview`、Helper 安装子目录 `computer-use/preview`、Windows AUMID |
 | 更新 | Preview 身份在两种后端下都禁用 updater / 强更 / 菜单与标题栏更新入口 | stable feed 上只有正式 `ZCode` 安装包，装到 Preview bundle 上等于再装一份正式版 |
-| 产物后缀 | `_TEST` 只标记 `ZCODE_ENV=test`；生产后端的 Preview 没有后缀 | 生产 Preview 靠 productName 区分：`ZCode Preview-<version>-mac-arm64.dmg` vs `ZCode-<version>-mac-arm64.dmg` |
+| 产物命名 | 产物名不再追加环境后缀 | 测试/正式包靠 productName 区分：`ZCode Preview-<version>-mac-arm64.dmg` vs `ZCode-<version>-mac-arm64.dmg` |
 | 发布链路 | `ZCODE_PREVIEW_IDENTITY == "1"` 与 `ZCODE_ENV == "test"` 同等对待：所有 release job `when: never`，`publish-release.sh` 硬拦截 | 生产后端的 Preview 仍是内部包 |
 | CUA Helper | 不改 | app id 仍是 `dev.zcode.app.preview`，Helper 的 launcher allowlist 已接受 |
 
@@ -295,10 +295,10 @@ workflow path selection
 
 | Case ID | Setup | Assertion | Evidence | Status |
 | --- | --- | --- | --- | --- |
-| ZPREVIEW-020 | `ZCODE_ENV=production ZCODE_PREVIEW_IDENTITY=1` | electron-builder 解析为 Preview 身份、无 `_TEST` 后缀 | `desktopProductIdentity.test.ts`、真实加载 `electron-builder.config.js` 四组组合 | verified |
+| ZPREVIEW-020 | `ZCODE_ENV=production ZCODE_PREVIEW_IDENTITY=1` | electron-builder 解析为 Preview 身份、产物名无环境后缀 | `desktopProductIdentity.test.ts`、真实加载 `electron-builder.config.js` 四组组合 | verified |
 | ZPREVIEW-021 | `ZCODE_ENV=test ZCODE_PREVIEW_IDENTITY=0` | 仍是 Preview，开关不能生成测试后端的正式 `ZCode` | `desktopProductIdentity.test.ts` | verified |
 | ZPREVIEW-022 | renderer / shared 注入 `__ZCODE_PRODUCT_FLAVOR__=preview` + `__ZCODE_ENV__=production` | `ZCODE_ENV=production`、`ZCODE_PRODUCT_FLAVOR=preview`；更新入口隐藏 | `shared/test/env.test.ts`、`viteRendererConfig.test.ts`、`windowsCaptionMenuButton.test.ts` | verified |
-| ZPREVIEW-023 | 生产后端 Preview 缺少 Apple 凭据 | notarize fail-closed，寻找 `*mac-arm64.dmg`（无 `_TEST`） | `notarizeMacosScript.test.ts` | verified |
+| ZPREVIEW-023 | 生产后端 Preview 缺少 Apple 凭据 | notarize fail-closed，寻找 `*mac-arm64.dmg`（无环境后缀） | `notarizeMacosScript.test.ts` | verified |
 | ZPREVIEW-024 | `publish-release.sh` 收到 `ZCODE_PREVIEW_IDENTITY=1` | 退出 1，不读取密钥 | `publishReleaseScript.test.ts` | verified |
 | ZPREVIEW-025 | CI 配置 | `build:preview:production` 存在且 optional；三条身份规则写 Preview 目录且带签名变量；7 个 release gate 含身份条件 | `ciNodeVersionConfig.test.ts` | verified |
 | ZPREVIEW-026 | 生产后端 Preview 与正式 `ZCode` 并排安装，用生产 BigModel 账号登录，无更新检查 | 两进程共存、登录成功、日志无 `[auto-update]` 请求 | manual signed artifact smoke | missing |

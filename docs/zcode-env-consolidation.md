@@ -71,7 +71,6 @@ renderer、host/service 和 agent 里的 ZCode API、远控链接、zcode-plan O
 
 ## 安装包命名
 
-正式环境安装包保持原有文件名，例如 `ZCode-3.0.0-mac-x64.dmg`。
-测试环境安装包在架构后追加 `_TEST`，例如 `ZCode-3.0.0-mac-x64_TEST.dmg`。
-同一规则适用于 macOS、Windows、Linux 产物，避免测试包与正式包在下载、上传或人工验收时混淆。
+所有平台的安装包文件名只保留产品身份，例如 `ZCode-3.0.0-mac-x64.dmg` 与
+`ZCode Preview-3.0.0-mac-x64.dmg`；不再按后端环境追加 `_TEST` 后缀，测试/正式包靠产品名区分。
 构建产物飞书通知会显示“测试环境/正式环境”标识；release 发布通知只用于正式发布。

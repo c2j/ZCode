@@ -192,9 +192,9 @@ sockets are minted as random `broker-<hex>.sock` files; do not hard-code
   native-search verifier。共享 deps 已有归档时只下载预编译产物，不要求 Cargo；缺少自产归档且
   允许补产时，还必须实际运行 Node 24、glibc 2.28、GCC 12 与 G++ 12，并提供 binutils、`make`、`curl` 和 `tar`。Linux 两个
   架构的 `rg` 都是 Microsoft musl 静态产物，其余 sidecar 由对应架构 producer 构建，不额外固定
-  镜像名称，但最终 ELF 的最高 GLIBC symbol version 不得超过 2.28。`x64` 在这里指 `x86_64` / `amd64`。rpm target 由 fpm 调用
-  系统 `rpmbuild` 产出（fpm 预编译二进制不自带），rpm 默认 xz 压缩还依赖系统 `xz`；job 兜底
-  安装同时覆盖两者（`rpm` + `xz-utils`），镜像建议预装以避免每次打包现场补装。
+  镜像名称，但最终 ELF 的最高 GLIBC symbol version 不得超过 2.28。`x64` 在这里指 `x86_64` / `amd64`。Linux
+  只产出 AppImage，appimagetool 由 electron-builder 自动下载；deb/rpm/pacman 下线后不再需要
+  系统 `rpmbuild` / `xz` / `bsdtar`。
 - `build:windows:x64` / `build:windows:arm64` 需要带 `windows` tag 的 runner，并预装 Node.js、Python 3.10+、Visual Studio Build Tools 2022（含 `VC.Tools.x86.x64`）；当前由 x64 Windows runner 交叉生成 arm64 Electron/NSIS 安装包。arm64 job 会按目标架构重新编译 CUA 原生 addon，因此**始终**要求 VS 2022 的 `VC.Tools.ARM64` 组件（不再只在 `ugrep` 补产分支下要求）。共享 deps 缺少对应 `ugrep` 归档且允许补产时，runner 还必须提供 CMake、`curl` 和 `tar`；已有归档的普通打包路径不因这条冷启动分支额外要求这些 native-search producer 命令。
 - Windows 打包前会执行 `scripts/ci-ensure-node-gyp-python.ps1` 与 `scripts/ci-import-vcvars64.ps1`，确保 `node-gyp` / `electron-rebuild` 的编译环境完整
 
@@ -218,11 +218,9 @@ sockets are minted as random `broker-<hex>.sock` files; do not hard-code
 
 ## Linux 安装包格式与 glibc 基线
 
-Linux 打包产出 `AppImage`、`deb`、`rpm` 三种安装包，x64 / arm64 双架构。`deb` 与 `rpm` 的 packageName 均按 flavor 拆分（`zcode` / `zcode-preview`），避免系统包管理器把另一 flavor 的安装当成升级替换。`latest.yml` 与 electron-updater 在 Linux 上固定以 AppImage 作为更新产物，`deb` / `rpm` 只做首次安装分发，不参与自更新；`upload-oss.sh` 解析更新元数据时也强制校验更新产物必须是 AppImage。
+Linux 打包只产出 `AppImage`（x64 / arm64 双架构），deb / rpm / pacman 目标已下线。`latest.yml` 与 electron-updater 在 Linux 上固定以 AppImage 作为更新产物，也是唯一分发的安装格式。
 
-rpm 面向 RHEL 8+（glibc 2.28）基线。整包 glibc 下限按 ELF `GLIBC_*` symbol version 实测：随包 node-pty prebuild 与 `bfs` / `ugrep` 为 2.28，Electron 41 主二进制为 2.25，`rg` 为 musl 静态无 glibc 依赖，整体 floor = 2.28；Ubuntu 20.04+、Debian 10+、RHEL 8+/9 均满足，CentOS 7、Ubuntu 18.04、Amazon Linux 2 不在支持范围。rpm 产物文件名复用统一 `artifactName` 模板，electron-builder 对 rpm/deb 使用包管理器架构名（`x86_64` / `amd64` / `aarch64`）落盘，Preview flavor 带 `_TEST` 后缀；`ci-collect-artifacts` 收集阶段统一归一化为 `-linux-x64` / `-linux-arm64` 命名（扩展名无关，`.rpm` 同样生效），`upload-oss.sh` 按归一化名收集，其扩展名 pattern 均已包含 `.rpm`。
-
-rpm Requires 在 electron-builder 默认集（gtk3、nss、libnotify、libXScrnSaver、libXtst、xdg-utils、at-spi2-core、libuuid）之外，通过 `rpm.fpm` 追加 `mesa-libgbm` 与 `alsa-lib`：这两个库是 Electron ELF 的 DT_NEEDED 实际依赖但不在默认集内，最小化 RHEL 上装完会因 `libgbm.so.1` 缺失无法启动（rockylinux:8 容器实测）；必须用 fpm `-d` 追加而不是 `depends`，后者会整组替换默认 Requires。rockylinux:8 冒烟链路已完成：rpm 元数据（flavor 包名 / `x86_64` arch 映射）、dnf 依赖解析安装、无显示环境 `ELECTRON_RUN_AS_NODE` 运行、随包 `bfs` / `ugrep` / `rg` 执行、安装树全量 ELF glibc 扫描（max = 2.28）全部通过。
+glibc 基线为 2.28。整包 glibc 下限按 ELF `GLIBC_*` symbol version 实测：随包 node-pty prebuild 与 `bfs` / `ugrep` 为 2.28，Electron 41 主二进制为 2.25，`rg` 为 musl 静态无 glibc 依赖，整体 floor = 2.28；Ubuntu 20.04+、Debian 10+、RHEL 8+/9 均满足，CentOS 7、Ubuntu 18.04、Amazon Linux 2 不在支持范围。
 
 ## 关键 CI 变量
 
@@ -246,7 +244,7 @@ rpm Requires 在 electron-builder 默认集（gtk3、nss、libnotify、libXScrnS
 - `CDN_PRELOAD_PROFILE` / `ALIYUN_CDN_PROFILE`：可选，控制 `cdn-preload.sh` 调用阿里云 CDN OpenAPI 时使用的 aliyun CLI profile。`CDN_PRELOAD_PROFILE` 优先级更高；支持单值复用，或配置为与 `CDN_DOMAIN` 等长的逗号列表。预热脚本不显式传 `--region`，region 由对应 profile 或 aliyun CLI 默认配置决定，避免覆盖多账号迁移时每个 profile 自带的 endpoint 配置。
 - `CDN_PRELOAD_DOMAINS`：历史兼容变量；当前 upload/preload 链路不再读取，新 OSS/CDN 迁移通过 `CDN_DOMAIN` 列表展开预热域名。
 - `ZCODE_UPDATE_FEED_URL`：可选运行时诊断变量，用完整服务端 manifest 接口 URL 覆盖默认更新检查接口。客户端仍会写入当前 `platform` / `device_mid` / `channel` 查询参数和对应 header，不切换到旧 generic feed。
-- `ZCODE_ENV`：可选，`production` 打正式包，`test` 打测试包。测试包文件名会追加 `_TEST`，构建产物飞书通知会把环境标识放进卡片标题；测试环境标题背景色使用红色，正式环境使用默认蓝色。`publish-release.sh` 会拒绝 `ZCODE_ENV=test` 调用正式 release API。
+- `ZCODE_ENV`：可选，`production` 打正式包，`test` 打测试包。产物文件名不再追加 `_TEST`（测试/正式包靠产品名区分），构建产物飞书通知会把环境标识放进卡片标题；测试环境标题背景色使用红色，正式环境使用默认蓝色。`publish-release.sh` 会拒绝 `ZCODE_ENV=test` 调用正式 release API。
 - `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID`：macOS notarytool 公证凭据
 - `APPLE_SIGNING_IDENTITY` 或 `CSC_NAME`：macOS 签名身份
 - `APPLE_DEVELOPER_ID_APPLICATION_P12_BASE64` / `APPLE_DEVELOPER_ID_APPLICATION_P12_PASSWORD`：macOS Developer ID Application p12。配置后 macOS build job 会为当前 job 创建一次性 keychain 并导入 p12，runtime 预签名和 electron-builder 最终签名都显式使用该 keychain，避免多个 job 共享 runner login keychain 时触发 `errSecInternalComponent`

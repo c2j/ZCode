@@ -78,7 +78,7 @@ const archBuilderFlagMap = {
 const artifactExtensionsByOs = {
   mac: [".dmg", ".zip"],
   win: [".exe"],
-  linux: [".AppImage", ".deb", ".rpm", ".pkg.tar.zst"],
+  linux: [".AppImage"],
 };
 const artifactArchHintsByArch = {
   x64: ["x64", "x86_64", "amd64"],
@@ -243,7 +243,7 @@ function escapeRegExp(value) {
 }
 
 export function artifactNameMatchesArch(fileName, archHint) {
-  // 部分环境的安装包会在架构后追加后缀（如 mac-arm64_TEST.dmg）。
+  // 部分环境的安装包会在架构后追加后缀（如 mac-arm64-universal.dmg）。
   // 体积审计必须接受 "_" 作为架构后的分隔符，否则包已生成但审计阶段会误报找不到产物。
   return new RegExp(`-${escapeRegExp(archHint.toLowerCase())}(?:[._-])`, "i").test(fileName);
 }

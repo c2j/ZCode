@@ -1,14 +1,18 @@
-# Linux Arch pacman package
+# Linux 分发与自动更新契约
+
+> 状态（2026-10-15 修订）：Linux 只分发 AppImage。deb / rpm / pacman 构建目标已下线
+> （`packages/desktop/electron-builder.config.js` 的 `linux.target` 只保留 `AppImage`），
+> 本文原先的 pacman 打包章节随之移除。下方“客户端自动更新契约”仍是当前运行时事实。
 
 ## 目标
 
-为 Linux x64/arm64 构建额外的 Arch Linux 原生安装包 `.pkg.tar.zst`，复用现有 Electron Builder 应用内容；AppImage 继续作为 Linux 自动更新主产物，deb/rpm 保持不变。
+Linux x64/arm64 只构建 AppImage 安装包，复用现有 Electron Builder 应用内容；AppImage 同时是 Linux 自动更新主产物。
 
 ## 边界
 
-- 本阶段不发布 PKGBUILD/AUR 源码配方；`.pkg.tar.zst` 由 Electron Builder 直接生成。
+- 只出 AppImage；不再生成 `.deb` / `.rpm` / `.pkg.tar.zst`。
 - 不改变应用运行时、协议、Agent、远程控制或自动更新协议。
-- pacman 包作为下载/安装分发产物，不作为 `latest.yml` 的 primary update artifact。
+- AppImage 作为 `latest.yml` 的 primary update artifact 与唯一分发格式。
 
 ## 构建与发布链路
 
@@ -16,28 +20,20 @@
 Linux x64/arm64 CI
         |
         v
-electron-builder
-  |       |       |       |
-AppImage deb     rpm     pacman (.pkg.tar.zst)
-  |       |       |       |
-  +-------+-------+-------+--> artifact collect -> upload -> release validation
+electron-builder (linux.target = ["AppImage"])
         |
-        +--> latest.yml primary path remains AppImage
+        v
+artifact collect -> upload -> release
+        |
+        +--> latest.yml primary path = AppImage
 ```
-
-## 包契约
-
-- 文件名沿用现有命名：`ZCode-<version>-linux-<arch>.pkg.tar.zst`。
-- package name 与 deb/rpm 使用相同的 flavor 隔离名称，避免 Preview/Production 互相覆盖。
-- pacman 依赖由配置中的 Arch 官方仓库运行时依赖列表生成（gtk3、nss、libxss、libxtst、libnotify、alsa-lib、mesa、xdg-utils）；计划在 Arch x64/arm64 上执行安装、启动、卸载 smoke test。
-- `.pkg.tar.zst` 进入 CI artifact manifest、OSS 上传和 release metadata，但不替代 AppImage 更新路径。
 
 ## 客户端自动更新契约（2026-09-16 修订）
 
 ZCT-2100231841920471040：3.12.1 在 Ubuntu deb 安装形态下载 3.12.2 时，旧过滤器删除 deb，只留下 AppImage；DebUpdater 找不到文件，读取 `fileInfo.info` 抛错。旧约定“Linux 仅 AppImage 支持自动更新”错误，现予以替换。
 
-- macOS、Windows、Linux 各安装形态均沿用 electron-updater 的下载、校验和安装流程；Linux 不再统一删除 deb/rpm/pacman。
-- 当前 updater 实例是安装类型的唯一真源；ManifestUpdateProvider 只为 Linux 更新器选择同类型产物，不另读 package-type、不维护第二份平台状态。AppImageUpdater 对应 `.AppImage`，DebUpdater 对应 `.deb`，RpmUpdater 对应 `.rpm`，PacmanUpdater 对应 `.pkg.tar.zst`（兼容 `.pacman`）。
+- macOS、Windows、Linux 各安装形态均沿用 electron-updater 的下载、校验和安装流程；Linux 的清单过滤不按格式统一删除。
+- 当前 updater 实例是安装类型的唯一真源；ManifestUpdateProvider 只为 Linux 更新器选择同类型产物，不另读 package-type、不维护第二份平台状态。AppImageUpdater 对应 `.AppImage`，DebUpdater 对应 `.deb`，RpmUpdater 对应 `.rpm`，PacmanUpdater 对应 `.pkg.tar.zst`（兼容 `.pacman`）。这些运行时分支保留用于识别历史安装；由于新发布只提供 AppImage，deb/rpm/pacman 安装将匹配不到同类型产物，按下面的“缺少包 = 明确失败”处理。
 - 清单缺少当前安装类型时，在解析边界明确失败，禁止 updater 的 fallback 误选其他格式。缺少包是发布不完整，不等于该安装方式不支持更新。
 - URL 按 pathname 判定后缀，支持绝对/相对地址、查询参数及大小写；保留真实下载 URL 与校验值。
 - PacmanUpdater 仍按旧 `.pacman` 后缀生成缓存路径，`.pkg.tar.zst` 的 `info.url` 使用实际文件名，避免把完整 URL 拼入缓存路径；网络下载 URL 不变。
@@ -52,6 +48,6 @@ ZCT-2100231841920471040：3.12.1 在 Ubuntu deb 安装形态下载 3.12.2 时，
 
 ## 风险与验收
 
-- 产物收集、共享目录清理、OSS glob、发布校验必须识别复合后缀 `.pkg.tar.zst`。
+- 产物收集、共享目录清理、OSS glob、发布校验只需识别 `.AppImage`。
 - 不得把源码、source map、密钥或 CI 凭据加入包；沿用现有 app.asar 裁剪策略。
-- 需要验证 pacman 包的架构、依赖、桌面 entry、`zcode://` 协议注册，以及与 deb/rpm 共存时的 package identity。
+- 需要验证 AppImage 包在目标发行版的启动、`zcode://` 协议注册与 `latest.yml` 更新路径。

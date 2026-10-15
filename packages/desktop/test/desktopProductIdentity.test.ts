@@ -4,7 +4,6 @@ import { resolve } from "node:path";
 
 import {
   desktopProductIdentities,
-  resolveDesktopArtifactSuffix,
   resolveDesktopProductFlavor,
   resolveWindowsAppUserModelId,
   resolveWindowsAppUserModelIdForFlavor,
@@ -28,7 +27,6 @@ describe("desktop product identity", () => {
       appId: "dev.zcode.app.preview",
       productName: "ZCode Preview",
       linuxExecutableName: "zcode-preview",
-      linuxPackageName: "zcode-preview",
       cuaHelperInstallVariant: "preview",
     });
   });
@@ -65,15 +63,6 @@ describe("desktop product identity", () => {
     );
   });
 
-  it("产物后缀只标记后端环境，生产后端的 Preview 包靠 productName 区分", () => {
-    expect(resolveDesktopArtifactSuffix({ ZCODE_ENV: "test" })).toBe("_TEST");
-    expect(resolveDesktopArtifactSuffix({ ZCODE_ENV: "production" })).toBe("");
-    expect(
-      resolveDesktopArtifactSuffix({ ZCODE_ENV: "production", ZCODE_PREVIEW_IDENTITY: "1" }),
-    ).toBe("");
-    expect(resolveDesktopArtifactSuffix({})).toBe("_TEST");
-  });
-
   it("ZCODE_ENV=production 完整保留正式包身份", () => {
     expect(resolveDesktopProductIdentity({ ZCODE_ENV: "production" })).toBe(
       desktopProductIdentities.production,
@@ -83,7 +72,6 @@ describe("desktop product identity", () => {
       appId: "dev.zcode.app",
       productName: "ZCode",
       linuxExecutableName: "zcode",
-      linuxPackageName: "zcode",
       cuaHelperInstallVariant: null,
     });
   });
