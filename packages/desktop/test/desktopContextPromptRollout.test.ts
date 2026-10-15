@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createDesktopContextPromptRollout,
+  createElectronDesktopContextPromptConfigFetcher,
   resolveDesktopContextPromptConfig,
 } from "../src/main/desktopContextPromptRollout.js";
 
@@ -267,6 +268,23 @@ describe("desktopContextPromptRollout", () => {
       expect(rollout.getSnapshot().enabled).toBe(true);
     } finally {
       vi.useRealTimers();
+    }
+  });
+});
+
+describe("createElectronDesktopContextPromptConfigFetcher", () => {
+  it("内网模式下不发起请求，直接失败让灰度回退默认快照", async () => {
+    vi.stubEnv("ZCODE_INTRANET_MODE", "1");
+    try {
+      const fetcher = createElectronDesktopContextPromptConfigFetcher({
+        appVersion: "1.2.3",
+        deviceMid: "device-mid",
+        resolveEndpointOrigin: async () => "https://zcode.z.ai",
+      });
+
+      await expect(fetcher(new AbortController().signal)).rejects.toThrow(/intranet mode/);
+    } finally {
+      vi.unstubAllEnvs();
     }
   });
 });

@@ -5,6 +5,7 @@ import {
   ZCODE_ENV,
   ZCODE_TELEMETRY_REPORT_ENDPOINT,
   buildZCodeSourceHeadersFromContext,
+  isIntranetMode,
   rewriteZCodeEndpointUrl,
   sanitizeTelemetryEventDetail,
   type TelemetryEventPayload,
@@ -417,6 +418,8 @@ export function createTelemetryCore(dependencies: TelemetryCoreDependencies = {}
   ): Promise<void> {
     // 构建期未配置事件上报端点时不上报（见 docs/desktop/build-time-optional-capabilities.md）
     if (!REPORT_ENDPOINT) return;
+    // 内网模式：不发起任何遥测上报（见 docs/desktop/intranet-offline-mode.md）。
+    if (isIntranetMode()) return;
     let marketingParams: OAuthLoginAttribution | null = null;
     try {
       marketingParams = await loadMarketingParams();

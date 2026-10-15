@@ -1,6 +1,7 @@
 import {
   buildZCodeEndpointUrls,
   buildZCodeSourceHeadersFromContext,
+  isIntranetMode,
   ZCODE_ENV,
   ZCODE_DESKTOP_CONTEXT_PROMPT_ENABLED_ENV,
 } from "@zcode/shared";
@@ -86,6 +87,10 @@ export function createElectronDesktopContextPromptConfigFetcher(options: {
   resolveEndpointOrigin: () => Promise<string>;
 }): (signal: AbortSignal) => Promise<unknown> {
   return async (signal) => {
+    // 内网模式：灰度配置拉取是官方后端轮询，直接失败回退默认快照（见 docs/desktop/intranet-offline-mode.md）。
+    if (isIntranetMode()) {
+      throw new Error("desktop client configs disabled by intranet mode");
+    }
     const { net } = await import("electron");
     const endpointOrigin = await options.resolveEndpointOrigin();
     const url = new URL(`${buildZCodeEndpointUrls(endpointOrigin).origin}/api/v1/client/configs`);

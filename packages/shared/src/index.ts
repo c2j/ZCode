@@ -80,6 +80,11 @@ export {
   normalizeZCodeEnv,
   normalizeZCodeProductFlavor,
 } from "./env.js";
+export {
+  ZCODE_INTRANET_MODE_ENV,
+  ZCODE_INTRANET_MODE_BUILT_IN,
+  isIntranetMode,
+} from "./intranetMode.js";
 export * from "./errors.js";
 export * from "./rendererActionTrace.js";
 export * from "./validation.js";

@@ -2,9 +2,9 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 /**
- * 桌面构建期可选能力的唯一解析入口：ARMS RUM 上报、事件上报、自动更新。
+ * 桌面构建期可选能力的唯一解析入口：ARMS RUM 上报、事件上报、自动更新、内网/离线模式。
  * 优先级：构建进程环境变量 > config/private/build-defaults.json（仅内部仓库存在）> 关闭。
- * 规则见 docs/desktop/build-time-optional-capabilities.md。
+ * 规则见 docs/desktop/build-time-optional-capabilities.md 与 docs/desktop/intranet-offline-mode.md。
  */
 export const PRIVATE_BUILD_DEFAULTS_PATH = resolve(
   import.meta.dirname,
@@ -12,6 +12,8 @@ export const PRIVATE_BUILD_DEFAULTS_PATH = resolve(
 );
 
 const ENABLED_VALUES = new Set(["1", "true", "yes"]);
+// 内网/离线模式默认开启：缺省即不访问互联网，只有显式写入关闭值才放行外连。
+const DISABLED_VALUES = new Set(["0", "false", "no", "off"]);
 
 async function readPrivateDefaults(path) {
   try {
@@ -44,6 +46,9 @@ export async function resolveBuildTimeConfig(
     autoUpdateEnabled: ENABLED_VALUES.has(
       pickValue(env, defaults, "ZCODE_AUTO_UPDATE").toLowerCase(),
     ),
+    intranetMode: !DISABLED_VALUES.has(
+      pickValue(env, defaults, "ZCODE_INTRANET_MODE").toLowerCase(),
+    ),
   };
 }
 
@@ -52,5 +57,6 @@ export function createBuildTimeConfigDefines(config) {
     __ZCODE_ARMS_RUM_ENDPOINT__: JSON.stringify(config.armsRumEndpoint),
     __ZCODE_TELEMETRY_REPORT_ENDPOINT__: JSON.stringify(config.telemetryReportEndpoint),
     __ZCODE_AUTO_UPDATE_ENABLED__: JSON.stringify(config.autoUpdateEnabled),
+    __ZCODE_INTRANET_MODE__: JSON.stringify(config.intranetMode),
   };
 }

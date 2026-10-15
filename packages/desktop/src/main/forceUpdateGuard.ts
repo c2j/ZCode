@@ -3,6 +3,7 @@ import {
   ZCODE_VERSION,
   buildZCodeEndpointUrls,
   getForceUpdateMinimalVersionFromConfig,
+  isIntranetMode,
   resolveForceUpdateRequirement,
   type ForceUpdateRequirement,
   type Locale,
@@ -152,6 +153,12 @@ export async function resolveDesktopForceUpdateRequirement(options: {
   endpointOrigin?: string;
   fetchRemoteConfig?: () => Promise<unknown>;
 }): Promise<ForceUpdateRequirement | null> {
+  // 内网模式：不拉取官方强制升级配置（见 docs/desktop/intranet-offline-mode.md）。
+  if (isIntranetMode()) {
+    options.logger.info("[force-update] 内网模式：跳过远端强制升级检查");
+    return null;
+  }
+
   const resolveFromConfig = (config: unknown) =>
     resolveForceUpdateRequirement({
       currentVersion: ZCODE_VERSION,
