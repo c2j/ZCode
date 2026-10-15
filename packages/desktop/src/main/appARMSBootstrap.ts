@@ -3,7 +3,12 @@ import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
 import armsRum from "@arms/rum-electron";
 import { ZCODE_AGENT_LIFECYCLE_LOG_MARKER } from "@zcode/shared/process-diagnostic";
-import { ZCODE_ARMS_RUM_ENDPOINT, ZCODE_VERSION, mapZCodeEnvToArmsRumEnv } from "@zcode/shared";
+import {
+  ZCODE_ARMS_RUM_ENDPOINT,
+  ZCODE_VERSION,
+  isIntranetMode,
+  mapZCodeEnvToArmsRumEnv,
+} from "@zcode/shared";
 import { ARMS_BROWSER_COLLECTORS, parseArmsViewName } from "../shared/armsRumShared.js";
 import { redactArmsEventBatch } from "./armsEventRedaction.js";
 import { ensureDesktopDeviceMidSync } from "./desktopDeviceMid.js";
@@ -162,7 +167,8 @@ armsRum.client.useReporter = (reporter) => {
 };
 export const armsInitPromise = armsRum
   .init({
-    enable: ZCODE_ARMS_RUM_ENDPOINT !== "",
+    // 内网模式：不初始化上报（见 docs/desktop/intranet-offline-mode.md）。
+    enable: ZCODE_ARMS_RUM_ENDPOINT !== "" && !isIntranetMode(),
     version: ZCODE_VERSION,
     endpoint: ZCODE_ARMS_RUM_ENDPOINT,
     env: armsRumEnv,

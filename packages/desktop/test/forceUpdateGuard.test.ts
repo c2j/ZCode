@@ -246,8 +246,23 @@ function mockNetResponse(options: {
 describe("forceUpdateGuard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
     electronMocks.resetPromptHandlers();
     electronMocks.setPromptAction("quit");
+  });
+
+  it("内网模式下直接跳过远端强制升级检查，不发请求", async () => {
+    vi.stubEnv("ZCODE_INTRANET_MODE", "1");
+    const { resolveDesktopForceUpdateRequirement } = await import(
+      "../src/main/forceUpdateGuard.js"
+    );
+    const logger = createLogger();
+
+    const requirement = await resolveDesktopForceUpdateRequirement({ logger });
+
+    expect(requirement).toBeNull();
+    expect(electronMocks.netRequestMock).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it("按当前 endpoint 拼接 client/configs 地址", async () => {

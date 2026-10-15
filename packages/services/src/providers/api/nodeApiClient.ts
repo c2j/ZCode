@@ -1,6 +1,7 @@
 import {
   ApiError,
   DEFAULT_ZCODE_ENDPOINT_ORIGIN,
+  isIntranetMode,
   normalizeZCodeEndpointOrigin,
   rewriteZCodeEndpointUrl,
   type ApiClient,
@@ -170,6 +171,14 @@ export class NodeApiClient implements ApiClient {
   }
 
   async request(input: string | URL, init?: ApiRequestInit): Promise<Response> {
+    // 内网模式：在出口短路，避免任何到 ZCode 后端的请求被构造/发出（见 docs/desktop/intranet-offline-mode.md）。
+    if (isIntranetMode()) {
+      throw new ApiError({
+        message: "ZCode backend request is disabled by intranet mode",
+        url: resolveUrl(input),
+        method: resolveMethod(init),
+      });
+    }
     const endpointOrigin = this.resolveZCodeEndpointOrigin
       ? await this.resolveZCodeEndpointOrigin()
       : undefined;

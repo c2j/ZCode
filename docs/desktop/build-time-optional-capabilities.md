@@ -13,6 +13,11 @@
 这样同一份源码可以产出“默认不上报、不自动更新”的构建，也可以产出启用这些能力的正式构建，
 不需要在源码里写死上报地址。
 
+内网/离线模式（`ZCODE_INTRANET_MODE`）由同一入口解析并注入 `__ZCODE_INTRANET_MODE__`，
+用于在调用出口短路官方后端与遥测请求。与上表三项不同，它**默认开启（缺省即不访问互联网）**，
+仅当显式写入关闭值（`0`/`false`/`no`/`off`）时才放行；语义、覆盖范围与验收见
+[intranet-offline-mode.md](./intranet-offline-mode.md)。
+
 ## 配置来源与优先级
 
 1. 构建进程的环境变量。显式设置为空字符串表示关闭。
@@ -26,7 +31,7 @@
         │ scripts/build-time-config.mjs（唯一解析入口）
         ▼
 desktop tsup（main、host、preload）与 desktop vite（renderer）的 define
-        │ __ZCODE_ARMS_RUM_ENDPOINT__ / __ZCODE_TELEMETRY_REPORT_ENDPOINT__ / __ZCODE_AUTO_UPDATE_ENABLED__
+        │ __ZCODE_ARMS_RUM_ENDPOINT__ / __ZCODE_TELEMETRY_REPORT_ENDPOINT__ / __ZCODE_AUTO_UPDATE_ENABLED__ / __ZCODE_INTRANET_MODE__
         ▼
 @zcode/shared env 常量 ── 运行时代码只读这些常量
 ```
