@@ -183,4 +183,7 @@ jobs:
         run: |
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --generate-notes
+          # 删除并重推 tag 时 GitHub 会把已存在的 release 转成 draft，若沿用 "已存在则跳过创建"
+          # 的分支，资产会上传成功但对外不可见（下载 404）。这里统一强制发布。
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber dist/*.zip dist/*.zip.sha256
